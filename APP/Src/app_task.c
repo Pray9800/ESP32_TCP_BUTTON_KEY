@@ -28,6 +28,7 @@ uint16_t wsred_cnt = 0;        // 闪烁时间毫秒累加器
 
 //任务通知类型
 static const char *TAG = "TSAK_APP";//用于应答
+static const char *TASK2 = "TSAK_KEY";//用于应答
 static const char *TASK3 = "TSAK_TCP";//用于应答
 static const char *TASK4 = "TSAK_WS_Light";//用于应答
 
@@ -65,7 +66,6 @@ static void vTask_Key_Sig(void *pvParameters)
     
     while (1)
     {     
-
         // 周期性扫描 10ms 消抖
         g_keys_value = Key_Process_Scan(); 
         //数据有变
@@ -80,9 +80,8 @@ static void vTask_Key_Sig(void *pvParameters)
             }
             Sys_Delay(10);
             g_keys_value_last = g_keys_value; //保存
-            ESP_LOGI(TAG, "key value: %d", g_keys_value); // 打印按键值到串口监视器
-        }
-       
+            ESP_LOGI(TASK2, "key value: %d", g_keys_value); // 打印按键值到串口监视器
+        }  
         // 10ms延时
         Sys_Delay(10); 
     }
@@ -95,7 +94,6 @@ static void vTask_TCP_Server(void *pvParameters)
 {
     wifi_init_softap(); // 先去初始化网络
     sys_delay_ms(1000); // 等待系统稳定
- 
     // 初始BSP里面的初始化
     int listen_sock = BSP_TCP_Server_Init(8080);
     if (listen_sock < 0) {
@@ -125,7 +123,7 @@ void vTask_WsLight_Change(void *pvParameters)
     ws2812_set_num_spi(WS_ARRAY_SIZE, 255, 255, 255); Sys_Delay(300);
     ws2812_set_num_spi(WS_ARRAY_SIZE, 100, 100, 100); Sys_Delay(300);
     ws2812_set_num_spi(WS_ARRAY_SIZE, 0, 0, 255);     Sys_Delay(300);
-   // ws2812_set_num_spi(WS_ARRAY_SIZE, 50, 50, 50);    Sys_Delay(300);
+    ws2812_set_num_spi(WS_ARRAY_SIZE, 50, 50, 50);    Sys_Delay(300);
     const TickType_t xFrequency = pdMS_TO_TICKS(10); // 10ms的意思
     
     ESP_LOGI(TASK4, "WS2812灯带指令控制");
@@ -165,8 +163,6 @@ void vTask_WsLight_Change(void *pvParameters)
             }
         }
 
-
-
         // ====================   10ms  ====================
         
         //  红灯 500ms 异步闪烁状态机
@@ -185,7 +181,6 @@ void vTask_WsLight_Change(void *pvParameters)
             wsred_cnt = 0;
             g_red_blink_state = 1; 
         }
-
         //  刷新判定状态机
         if ((g_rgb_sign != g_rgb_sign_last) || g_brightness_flag) 
         {
@@ -234,9 +229,6 @@ void app_task_init(void)
 
      //创建灯带控制代码  控制灯带
     xTaskCreate(vTask_WsLight_Change, "vTask_WsLight_Change", 4096, NULL, 5,&xWsLightTaskHandle);
-
-
-
 
 }
 

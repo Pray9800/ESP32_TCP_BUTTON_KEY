@@ -12,6 +12,16 @@
 
 
 static const char *TAG = "BSP_WIFI";//用于应答
+
+ /*******************************************************
+ Author: PAN       Version: V1.0       Date:2026/06/15
+ Function:          wifi_init_softap
+ Description:       初始化WiFi AP热点模式，配置NVS、网络接口、静态IP及DHCP，启动热点
+ Input:             无
+ Output:            无
+ Return:            无
+ Others:            热点SSID: YOZX-C6, 密码: 12345678, 固定IP: 192.168.100.125
+*******************************************************/
 void wifi_init_softap(void)
 {
     // 1. 初始化 NVS 闪存（Wi-Fi 底层必须用到它来存校准数据）

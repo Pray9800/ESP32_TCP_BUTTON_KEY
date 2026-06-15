@@ -10,6 +10,18 @@
 static const char *TAG = "BSP_TCP";
 volatile int g_active_tcp_sock = -1; // -1 代表当前没有手机/上位机连接TCP/IP
 
+
+
+
+ /*******************************************************
+ Author: PAN       Version: V1.0       Date:2026/06/15
+ Function:          BSP_TCP_Server_Init
+ Description:       初始化TCP服务器，创建Socket并绑定指定端口开始监听
+ Input:             port - 要监听的端口号
+ Output:            无
+ Return:            listen_sock - 监听套接字描述符，失败返回-1
+ Others:            无
+*******************************************************/
 int BSP_TCP_Server_Init(uint16_t port)
 {
     // 1. 创建 Socket
@@ -46,6 +58,15 @@ int BSP_TCP_Server_Init(uint16_t port)
     return listen_sock; // 反馈结果
 }
 
+ /*******************************************************
+ Author: PAN       Version: V1.0       Date:2026/06/15
+ Function:          BSP_TCP_Wait_And_Handle
+ Description:       阻塞等待客户端连接，接收数据并逐字节送入协议解析状态机，处理断开与异常清理
+ Input:             listen_sock - 由BSP_TCP_Server_Init返回的监听套接字
+ Output:            无
+ Return:            无
+ Others:            无
+*******************************************************/
 void BSP_TCP_Wait_And_Handle(int listen_sock)
 {
     char rx_buffer[128]; 
@@ -64,9 +85,9 @@ void BSP_TCP_Wait_And_Handle(int listen_sock)
     
     //=================   开启底层 TCP Keep-Alive 机制 =================
     int keepAlive = 1;      // 1. 开启 Keep-Alive
-    int keepIdle = 5;       // 2. 如果 5 秒钟内双方没有任何数据通信，ESP32 开始起疑心
+    int keepIdle = 5;       // 2. 如果 5 秒钟内双方没有任何数据通信，ESP32  
     int keepInterval = 2;   // 3. 每隔 2 秒钟，ESP32 底层发送探测包
-    int keepCount = 3;      // 4. 3次没有回复消息
+    int keepCount = 3;      // 4. 3次没有回复消息ACK
     setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE,  &keepAlive, sizeof(keepAlive));  //开启心跳包
     setsockopt(sock, IPPROTO_TCP, TCP_KEEPIDLE, &keepIdle, sizeof(keepIdle));   //配置时间
     setsockopt(sock, IPPROTO_TCP, TCP_KEEPINTVL, &keepInterval, sizeof(keepInterval)); //配置试探间隔

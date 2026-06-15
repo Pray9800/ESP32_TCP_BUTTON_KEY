@@ -3,5 +3,7 @@
 
 idf_component_register(SRCS "Src/app_task.c"
                             "Src/app_task_led.c"
+                            "Src/app_task_tcp.c"
+                           
                        INCLUDE_DIRS "Inc"
                        REQUIRES freertos BSP log)
