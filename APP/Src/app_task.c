@@ -19,15 +19,19 @@ uint8_t g_rgb_value = 0, g_rgb_sign = 0, g_rgb_sign_last = 0; //UR机械臂传�
 // A5 5A 帧头 0A 指令 01长度 01数据 b6 6b真尾
 //00 没有按键  01第一个按键  02第二个按键  03第三个按键  04第四个按键 
 uint8_t wifi_key_msg[7] = {0xa5,0x5a,0x0a,0x01,0x00,0xb6,0x6b}; 
+uint8_t wifi_Light_msg[7] = {0xa5,0x5a,0x0a,0x01,0x00,0xb6,0x6b}; 
 uint16_t rgb_cnt = 0;  // 刷新用于计数
 uint8_t g_brightness = 100; //全局亮度
 uint8_t g_brightness_flag = 0; //亮度变化指令
 uint8_t g_red_blink_state = 1; //红灯闪烁状态 灯带闪烁 不是指示灯 初始化为1 保证先亮灯
-uint16_t wsred_cnt = 0;          // 闪烁时间毫秒累加器
+uint16_t wsred_cnt = 0;        // 闪烁时间毫秒累加器
 
 //任务通知类型
 static const char *TAG = "TSAK_APP";//用于应答
 static const char *TASK3 = "TSAK_TCP";//用于应答
+static const char *TASK4 = "TSAK_WS_Light";//用于应答
+
+
 
 
 
@@ -50,24 +54,17 @@ static void vTask_Led_Blink(void *pvParameters)
 
 
 
-
 // ==================== 任务二：按键扫描逻辑任务 ====================
 static void vTask_Key_Sig(void *pvParameters)
 {
     // 灯带初始化3
     bsp_key_init(); // 四个按键的GPIO配置
-    ws2812_spi_init();// 初始化 SPI 和 DMA
+  
      ESP_LOGI(TAG, "hello wisdom pan 2027"); 
-    ws2812_set_num_spi(WS_ARRAY_SIZE, 255, 255, 255); Sys_Delay(500);
-    ws2812_set_num_spi(WS_ARRAY_SIZE, 100, 100, 100); Sys_Delay(500);
-    ws2812_set_num_spi(WS_ARRAY_SIZE, 0, 0, 255);     Sys_Delay(500);
-    ws2812_set_num_spi(WS_ARRAY_SIZE, 50, 50, 50);    Sys_Delay(500);
-    
-   
 
+    
     while (1)
-    {
-       
+    {     
 
         // 周期性扫描 10ms 消抖
         g_keys_value = Key_Process_Scan(); 
@@ -91,9 +88,6 @@ static void vTask_Key_Sig(void *pvParameters)
     }
 
 }
-
-
-
 
 
 // ==================== 任务三：TCP Server 通讯任务 ====================
@@ -127,9 +121,14 @@ static void vTask_TCP_Server(void *pvParameters)
 void vTask_WsLight_Change(void *pvParameters)
 {
     
+    ws2812_spi_init();// 初始化 SPI 和 DMA
+    ws2812_set_num_spi(WS_ARRAY_SIZE, 255, 255, 255); Sys_Delay(300);
+    ws2812_set_num_spi(WS_ARRAY_SIZE, 100, 100, 100); Sys_Delay(300);
+    ws2812_set_num_spi(WS_ARRAY_SIZE, 0, 0, 255);     Sys_Delay(300);
+   // ws2812_set_num_spi(WS_ARRAY_SIZE, 50, 50, 50);    Sys_Delay(300);
     const TickType_t xFrequency = pdMS_TO_TICKS(10); // 10ms的意思
     
-    ESP_LOGI(TAG, "WS2812灯带指令控制");
+    ESP_LOGI(TASK4, "WS2812灯带指令控制");
 
     while (1) 
     {
@@ -139,6 +138,7 @@ void vTask_WsLight_Change(void *pvParameters)
         // ==================== 如果是网络丢来了新指令 ====================
         if (notified > 0)  
         {
+            
             if (UR_Send_Msg.cmd == 0x0B) // 亮度指令
             {
                 g_brightness = UR_Send_Msg.data; 
@@ -154,7 +154,18 @@ void vTask_WsLight_Change(void *pvParameters)
                 else if (g_rgb_sign == 2) g_rgb_value = 1; // 蓝
                 else if (g_rgb_sign == 1) g_rgb_value = 7; // 白
             }
+
+                //反馈更新
+                if (g_active_tcp_sock != -1) 
+            {
+
+                wifi_Light_msg[2]= UR_Send_Msg.cmd;
+                wifi_Light_msg[4]= UR_Send_Msg.data;
+                send(g_active_tcp_sock, wifi_Light_msg, sizeof(wifi_Light_msg), 0);                  
+            }
         }
+
+
 
         // ====================   10ms  ====================
         
@@ -180,10 +191,11 @@ void vTask_WsLight_Change(void *pvParameters)
         {
             rgb_cnt++; // 刷新次数
             if (rgb_cnt >= 3) 
-            {
+            {   
                 rgb_cnt = 0;
                 g_rgb_sign_last = g_rgb_sign; // 达到 3 次，锁定不再重复刷新
                 g_brightness_flag = 0;        // 清除亮度变化标志
+
             } 
             else 
             {  

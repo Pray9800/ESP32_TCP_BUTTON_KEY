@@ -62,17 +62,15 @@ void BSP_TCP_Wait_And_Handle(int listen_sock)
     ESP_LOGI(TAG, "客户端已连接！");
     g_active_tcp_sock = sock;
     
-
-
-    // // =================   开启底层 TCP Keep-Alive 机制 =================
-    // int keepAlive = 1;      // 1. 开启 Keep-Alive
-    // int keepIdle = 5;       // 2. 如果 5 秒钟内双方没有任何数据通信，ESP32 开始起疑心
-    // int keepInterval = 2;   // 3. 每隔 2 秒钟，ESP32 底层偷偷给手机发一个极其微小的探测包
-    // int keepCount = 3;      // 4. 3次没有回复消息
-    // setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &keepAlive, sizeof(keepAlive));  //开启心跳包
-    // setsockopt(sock, IPPROTO_TCP, TCP_KEEPIDLE, &keepIdle, sizeof(keepIdle));   //配置时间
-    // setsockopt(sock, IPPROTO_TCP, TCP_KEEPINTVL, &keepInterval, sizeof(keepInterval)); //配置试探间隔
-    // setsockopt(sock, IPPROTO_TCP, TCP_KEEPCNT, &keepCount, sizeof(keepCount));  //次数
+    //=================   开启底层 TCP Keep-Alive 机制 =================
+    int keepAlive = 1;      // 1. 开启 Keep-Alive
+    int keepIdle = 5;       // 2. 如果 5 秒钟内双方没有任何数据通信，ESP32 开始起疑心
+    int keepInterval = 2;   // 3. 每隔 2 秒钟，ESP32 底层发送探测包
+    int keepCount = 3;      // 4. 3次没有回复消息
+    setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE,  &keepAlive, sizeof(keepAlive));  //开启心跳包
+    setsockopt(sock, IPPROTO_TCP, TCP_KEEPIDLE, &keepIdle, sizeof(keepIdle));   //配置时间
+    setsockopt(sock, IPPROTO_TCP, TCP_KEEPINTVL, &keepInterval, sizeof(keepInterval)); //配置试探间隔
+    setsockopt(sock, IPPROTO_TCP, TCP_KEEPCNT, &keepCount, sizeof(keepCount));  //次数
 
     // 5. 连接成功后的数据收发循环
     while (1) 
@@ -85,8 +83,7 @@ void BSP_TCP_Wait_And_Handle(int listen_sock)
             
                 for (int i = 0; i < len; i++) 
             {
-                Protocol_Parse_Byte((uint8_t)rx_buffer[i]);  
-                
+                Protocol_Parse_Byte((uint8_t)rx_buffer[i]);                 
             }
                       
         } 

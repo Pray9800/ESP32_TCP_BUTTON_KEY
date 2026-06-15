@@ -60,7 +60,7 @@ void Protocol_Parse_Byte(uint8_t rx_temp)
                         xTaskNotifyGive(xWsLightTaskHandle);
                     }
                     
-                    ESP_LOGI(TAG , "精准解析! CMD:%02X, LEN:%02X, DATA:%02X", 
+                    ESP_LOGI(TAG , "解析结果 CMD:%02X, LEN:%02X, DATA:%02X", 
                              UR_Send_Msg.cmd, UR_Send_Msg.len, UR_Send_Msg.data);
                 }
                 rx_cnt = 0; //  清零 
