@@ -1,0 +1,22 @@
+#include <stdio.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "driver/gpio.h"
+#include "esp_log.h"
+#include "app_task.h"
+
+
+
+void app_main(void)
+{
+
+      // ESP_LOGI(TAG, "hello wisdom pan");
+      app_task_init();
+//    while (1)
+//    {
+        
+//          vTaskDelay(1000);
+//          ESP_LOGI(TAG, "hello wisdom pan");
+//    }
+
+}
