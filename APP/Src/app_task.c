@@ -19,7 +19,8 @@ uint8_t g_rgb_value = 0, g_rgb_sign = 0, g_rgb_sign_last = 0; //UR机械臂传�
 // A5 5A 帧头 0A 指令 01长度 01数据 b6 6b真尾
 //00 没有按键  01第一个按键  02第二个按键  03第三个按键  04第四个按键 
 uint8_t wifi_key_msg[7] = {0xa5,0x5a,0x0a,0x01,0x00,0xb6,0x6b}; 
-uint8_t wifi_Light_msg[7] = {0xa5,0x5a,0x0a,0x01,0x00,0xb6,0x6b}; 
+//灯反馈模式 C0开头防止混淆
+uint8_t wifi_Light_msg[7] = {0xa5,0x5a,0x0c,0x01,0x00,0xb6,0x6b}; 
 uint16_t rgb_cnt = 0;  // 刷新用于计数
 uint8_t g_brightness = 100; //全局亮度
 uint8_t g_brightness_flag = 0; //亮度变化指令
@@ -29,7 +30,6 @@ uint16_t wsred_cnt = 0;        // 闪烁时间毫秒累加器
 //任务通知类型
 static const char *TAG = "TSAK_APP";//用于应答
 static const char *TASK2 = "TSAK_KEY";//用于应答
-static const char *TASK3 = "TSAK_TCP";//用于应答
 static const char *TASK4 = "TSAK_WS_Light";//用于应答
 
 
@@ -89,29 +89,6 @@ static void vTask_Key_Sig(void *pvParameters)
 }
 
 
-// ==================== 任务三：TCP Server 通讯任务 ====================
-static void vTask_TCP_Server(void *pvParameters)
-{
-    wifi_init_softap(); // 先去初始化网络
-    sys_delay_ms(1000); // 等待系统稳定
-    // 初始BSP里面的初始化
-    int listen_sock = BSP_TCP_Server_Init(8080);
-    if (listen_sock < 0) {
-        ESP_LOGE(TASK3, "初始话失败 删除任务");
-        vTaskDelete(NULL);   
-    }
-   
-    /*循环调度 */
-    while (1) 
-    {
-        //  接收信息和处理
-        BSP_TCP_Wait_And_Handle(listen_sock);
-        
-        //   底层 accept 失败退出来了 
-        sys_delay_ms(100); 
-    }
-}
-
 
 
 
@@ -155,9 +132,7 @@ void vTask_WsLight_Change(void *pvParameters)
 
                 //反馈更新
                 if (g_active_tcp_sock != -1) 
-            {
-
-                wifi_Light_msg[2]= UR_Send_Msg.cmd;
+            {  
                 wifi_Light_msg[4]= UR_Send_Msg.data;
                 send(g_active_tcp_sock, wifi_Light_msg, sizeof(wifi_Light_msg), 0);                  
             }

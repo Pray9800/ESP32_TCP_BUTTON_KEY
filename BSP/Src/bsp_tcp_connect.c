@@ -60,16 +60,16 @@ int BSP_TCP_Server_Init(uint16_t port)
 
  /*******************************************************
  Author: PAN       Version: V1.0       Date:2026/06/15
- Function:          BSP_TCP_Wait_And_Handle
- Description:       阻塞等待客户端连接，接收数据并逐字节送入协议解析状态机，处理断开与异常清理
+ Function:         BSP_TCP_Accept_Client
+ Description:       阻塞等待客户端连接 
  Input:             listen_sock - 由BSP_TCP_Server_Init返回的监听套接字
- Output:            无
- Return:            无
+ Output:            sock
+ Return:            成功返回与客户端通信的套接字描述符(sock)，失败返回 -1
  Others:            无
 *******************************************************/
-void BSP_TCP_Wait_And_Handle(int listen_sock)
+int BSP_TCP_Accept_Client(int listen_sock)
 {
-    char rx_buffer[128]; 
+     
     struct sockaddr_storage source_addr;
     socklen_t addr_len = sizeof(source_addr);
     
@@ -77,11 +77,11 @@ void BSP_TCP_Wait_And_Handle(int listen_sock)
     int sock = accept(listen_sock, (struct sockaddr *)&source_addr, &addr_len);
     if (sock < 0) {
         ESP_LOGE(TAG, "接受连接失败，重试...");
-        return; //  退出函数 
+        return -1; //  退出函数 
     }
     
     ESP_LOGI(TAG, "客户端已连接！");
-    g_active_tcp_sock = sock;
+    g_active_tcp_sock = sock;// 给全局句柄赋值
     
     //=================   开启底层 TCP Keep-Alive 机制 =================
     int keepAlive = 1;      // 1. 开启 Keep-Alive
@@ -93,37 +93,6 @@ void BSP_TCP_Wait_And_Handle(int listen_sock)
     setsockopt(sock, IPPROTO_TCP, TCP_KEEPINTVL, &keepInterval, sizeof(keepInterval)); //配置试探间隔
     setsockopt(sock, IPPROTO_TCP, TCP_KEEPCNT, &keepCount, sizeof(keepCount));  //次数
 
-    // 5. 连接成功后的数据收发循环
-    while (1) 
-    {
-        int len = recv(sock, rx_buffer, sizeof(rx_buffer) - 1, 0);
-        if (len > 0) 
-        {
-            rx_buffer[len] = 0; 
-            ESP_LOGI(TAG, "收到指令: %s", rx_buffer);
-            
-                for (int i = 0; i < len; i++) 
-            {
-                Protocol_Parse_Byte((uint8_t)rx_buffer[i]);                 
-            }
-                      
-        } 
-        else if (len == 0) 
-        {
-            ESP_LOGW(TAG, "客户端正常断开连接");
-            break; 
-        } 
-        else 
-        {
-            ESP_LOGE(TAG, "接收错误或客户端异常闪退");
-            break; 
-        }
-    }
-
-    // 清理当前断开的通信连接
-    if (sock != -1) {
-        g_active_tcp_sock = -1;
-        close(sock);
-        ESP_LOGI(TAG, "回到状态挂起...");
-    }
+    
+     return sock; //返回句柄
 }
