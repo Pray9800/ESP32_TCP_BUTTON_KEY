@@ -11,7 +11,7 @@ idf_component_register(SRCS "Src/bsp_led.c"
                             "Src/bsp_tcp_connect.c"
                             "Src/bsp_parse.c"
                              "Src/bsp_iwdg.c"
-                       INCLUDE_DIRS "Inc"
+                       INCLUDE_DIRS "Inc"  
                        REQUIRES driver esp_driver_gpio esp_driver_uart
-                        esp_driver_spi freertos esp_wifi esp_netif lwip nvs_flash log )
+                       esp_driver_spi freertos esp_wifi esp_netif lwip nvs_flash log APP)
                        

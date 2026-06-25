@@ -15,7 +15,7 @@
 
 
 
-// ==================== 网络出厂全局配置 ====================
+// ==================== UR机械臂  WIFI连接版本网络初始化配置 ====================
 #define C6_WIFI_SSID          "YOZX-C6"        // Wi-Fi 热点名称
 #define C6_WIFI_PASS          "12345678"       // Wi-Fi 密码
 
@@ -23,7 +23,7 @@
 #define C6_SERVER_NETMASK     "255.255.255.0"  // 子网掩码
 #define C6_SERVER_GW          "192.168.100.1"  // 网关
 
-#define C6_TCP_PORT           8080             // 监听端口
+#define C6_TCP_PORT           8238             // 监听端口
 
 
 

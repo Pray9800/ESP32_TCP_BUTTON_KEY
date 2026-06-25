@@ -5,6 +5,7 @@
 #include <string.h>
 #include "esp_netif.h"
 #include "lwip/ip_addr.h"
+#include "app_task.h"
 #define MODE_AP   0  // 热点模式
 #define MODE_STA  1  // 联网模式
 #define WIFI_MODE_SELECT   MODE_AP
@@ -48,10 +49,10 @@ if (ap_netif != NULL)
     {
         esp_netif_ip_info_t ip_info;
         
-        // 2. 使用高效率的 IP4_ADDR 宏进行硬件级数值拼接
-        IP4_ADDR(&ip_info.ip, 192, 168, 100, 125);
-        IP4_ADDR(&ip_info.netmask, 255, 255, 255, 0);
-        IP4_ADDR(&ip_info.gw, 192, 168, 100, 1); 
+        // 传入设定IP 掩码 公网
+        esp_netif_str_to_ip4(C6_SERVER_IP, &ip_info.ip); 
+        esp_netif_str_to_ip4(C6_SERVER_NETMASK, &ip_info.netmask);
+        esp_netif_str_to_ip4(C6_SERVER_GW, &ip_info.gw);
 
         // 关 DHCP -> 新 IP -> 开 DHCP 
         esp_netif_dhcps_stop(ap_netif);        
@@ -60,14 +61,8 @@ if (ap_netif != NULL)
         
         ESP_LOGI(TAG, "固定 IP: 192.168.100.125");
     } else {
-        ESP_LOGE(TAG, "严重错误：未找到 WIFI_AP_DEF 对应的句柄！");
+        ESP_LOGE(TAG, "严重错误：未找到 WIFI_AP_DEF 对应的句柄 ");
     }
-
-
-
-
-
-
 
     // 3. 配置并启动 Wi-Fi (AP热点模式)
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
@@ -75,9 +70,9 @@ if (ap_netif != NULL)
 
     wifi_config_t wifi_config = {
         .ap = {
-            .ssid = "YOZX-C6",   // Wi-Fi 名字
-            .ssid_len = strlen("YOZX-C6"),
-            .password = "12345678",        // Wi-Fi 密码
+            .ssid = C6_WIFI_SSID,                  // wifi名称 
+            .ssid_len = strlen(C6_WIFI_SSID),      // 长度
+            .password = C6_WIFI_PASS,              // 密码
             .max_connection = 10,           // 最大连接数
             .authmode = WIFI_AUTH_WPA2_PSK // 加密方式
 

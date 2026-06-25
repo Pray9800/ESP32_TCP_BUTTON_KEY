@@ -8,8 +8,8 @@
 static  uint8_t led_state = 0; // 0: 灭，1: 亮
 void led_init(void)
 {
-    gpio_reset_pin(BLINK_GPIO);
-    gpio_set_direction(BLINK_GPIO, GPIO_MODE_OUTPUT);
+    gpio_reset_pin(BLINK_GPIO); //复位到默认状态
+    gpio_set_direction(BLINK_GPIO, GPIO_MODE_OUTPUT);//
 }
 
    
@@ -27,3 +27,10 @@ void led_blink(void)
     }
   
 }
+
+
+
+
+
+ 
+

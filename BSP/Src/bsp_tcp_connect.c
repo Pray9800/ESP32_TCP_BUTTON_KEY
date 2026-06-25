@@ -1,4 +1,4 @@
-#include "bsp_tcp_connect.h"
+﻿#include "bsp_tcp_connect.h"
 #include "esp_log.h"
 #include "lwip/sockets.h"
 #include <string.h>
@@ -6,7 +6,7 @@
 #include "freertos/task.h"
 #include "bsp_wifi.h"
 #include "bsp_parse.h"
-
+#include <errno.h>
 static const char *TAG = "BSP_TCP";
 volatile int g_active_tcp_sock = -1; // -1 代表当前没有手机/上位机连接TCP/IP
 
@@ -25,7 +25,7 @@ volatile int g_active_tcp_sock = -1; // -1 代表当前没有手机/上位机连
 int BSP_TCP_Server_Init(uint16_t port)
 {
     // 1. 创建 Socket
-    int listen_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
+    int listen_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_IP); //IPV4 ; 流式套接字-- TCP 协议 ;
     if (listen_sock < 0) {
         ESP_LOGE(TAG, "Socket 创建失败");
         return -1;
@@ -49,7 +49,7 @@ int BSP_TCP_Server_Init(uint16_t port)
 
     // 3. 开始监听
     if (listen(listen_sock, 1) < 0) {
-        ESP_LOGE(TAG, "监听失败！");
+        ESP_LOGE(TAG, "监听失败");
         close(listen_sock);
         return -1;
     }
@@ -73,26 +73,50 @@ int BSP_TCP_Accept_Client(int listen_sock)
     struct sockaddr_storage source_addr;
     socklen_t addr_len = sizeof(source_addr);
     
-    // 4. 阻塞等待客户端连接
+    //  阻塞等待客户端连接
     int sock = accept(listen_sock, (struct sockaddr *)&source_addr, &addr_len);
     if (sock < 0) {
         ESP_LOGE(TAG, "接受连接失败，重试...");
         return -1; //  退出函数 
     }
     
-    ESP_LOGI(TAG, "客户端已连接！");
+    ESP_LOGI(TAG, "客户端已连接");
     g_active_tcp_sock = sock;// 给全局句柄赋值
     
-    //=================   开启底层 TCP Keep-Alive 机制 =================
-    int keepAlive = 1;      // 1. 开启 Keep-Alive
-    int keepIdle = 5;       // 2. 如果 5 秒钟内双方没有任何数据通信，ESP32  
-    int keepInterval = 2;   // 3. 每隔 2 秒钟，ESP32 底层发送探测包
-    int keepCount = 3;      // 4. 3次没有回复消息ACK
-    setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE,  &keepAlive, sizeof(keepAlive));  //开启心跳包
-    setsockopt(sock, IPPROTO_TCP, TCP_KEEPIDLE, &keepIdle, sizeof(keepIdle));   //配置时间
-    setsockopt(sock, IPPROTO_TCP, TCP_KEEPINTVL, &keepInterval, sizeof(keepInterval)); //配置试探间隔
-    setsockopt(sock, IPPROTO_TCP, TCP_KEEPCNT, &keepCount, sizeof(keepCount));  //次数
+    // //=================   开启底层 TCP Keep-Alive 机制 =================
+    // int keepAlive = 1;      // 1. 开启 Keep-Alive
+    // int keepIdle = 5;       // 2. 如果 5 秒钟内双方没有任何数据通信，ESP32  
+    // int keepInterval = 2;   // 3. 每隔 2 秒钟，ESP32 底层发送探测包
+    // int keepCount = 3;      // 4. 3次没有回复消息ACK
+     
+    // setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE,  &keepAlive, sizeof(keepAlive));  //开启心跳包
+    // setsockopt(sock, IPPROTO_TCP, TCP_KEEPIDLE, &keepIdle, sizeof(keepIdle));   //配置时间
+    // setsockopt(sock, IPPROTO_TCP, TCP_KEEPINTVL, &keepInterval, sizeof(keepInterval)); //配置试探间隔
+    // setsockopt(sock, IPPROTO_TCP, TCP_KEEPCNT, &keepCount, sizeof(keepCount));  //次数
 
+       // ================ TCP Socket 性能优化 =================
+
+    // 1. 禁用 Nagle —— 7 字节小包立即发出
+    int nodelay = 1;
+    setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &nodelay, sizeof(nodelay));
+
+    // 2. 发送超时 50ms —— 防止 send() 卡死按键扫描任务
+    struct timeval send_timeout = { .tv_sec = 0, .tv_usec = 50000 };
+    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &send_timeout, sizeof(send_timeout));
+
+    // 3. Keep-Alive 放宽间隔 —— 减少 WiFi TX 竞争
+    int keepAlive = 1;
+    setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &keepAlive, sizeof(keepAlive));
+
+    int keepIdle = 30;          // 30 秒空闲才开始探测
+    setsockopt(sock, IPPROTO_TCP, TCP_KEEPIDLE, &keepIdle, sizeof(keepIdle));
+
+    int keepInterval = 5;       // 每 5 秒一次探测
+    setsockopt(sock, IPPROTO_TCP, TCP_KEEPINTVL, &keepInterval, sizeof(keepInterval));
+
+    int keepCount = 3;
+    setsockopt(sock, IPPROTO_TCP, TCP_KEEPCNT, &keepCount, sizeof(keepCount));
+     
     
      return sock; //返回句柄
 }

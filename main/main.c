@@ -10,10 +10,6 @@
 void app_main(void)
 {
       app_task_init();
-      //    while (1)
-      //    {      
-      //          vTaskDelay(1000);
-      //          ESP_LOGI(TAG, "hello wisdom pan");
-      //    }
+   
 
 }

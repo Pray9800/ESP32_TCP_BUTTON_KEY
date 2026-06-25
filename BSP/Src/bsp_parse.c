@@ -1,6 +1,7 @@
 #include "bsp_parse.h"
 #include "esp_log.h"
-
+#include "esp_system.h"
+#include "bsp_tim.h"
 uart1_data_t UR_Send_Msg;
 static uint8_t UART1_Rxbuff[64]; // 内部帧缓存
 
@@ -15,7 +16,10 @@ static const char *TAG = "BSP_PARSE";
 void Protocol_Parse_Byte(uint8_t rx_temp)
 {
     static uint8_t rx_cnt = 0;
-    
+    //防止越界
+    if (rx_cnt >= sizeof(UART1_Rxbuff)) {
+        rx_cnt = 0; 
+    }
     if (rx_cnt == 0) // 1. 找包头 A5
     {
         if (rx_temp == 0xA5) {
@@ -37,6 +41,24 @@ void Protocol_Parse_Byte(uint8_t rx_temp)
         UART1_Rxbuff[rx_cnt] = rx_temp;
         rx_cnt++;
         
+
+
+       //重启功能
+    if (rx_cnt == 7) 
+        {
+            if (UART1_Rxbuff[2] == 0x0F && UART1_Rxbuff[3] == 0x01 && 
+                UART1_Rxbuff[4] == 0x00 && UART1_Rxbuff[5] == 0xB6 && 
+                UART1_Rxbuff[6] == 0x6B) 
+            {
+                ESP_LOGW(TAG, "收到软复位指令，主控即将重启！");
+                Sys_Delay(50); // 给串口留 50ms 打印日志的时间
+                esp_restart();                 // 触发硬件级重启
+            }
+        }
+
+
+
+
         //  当收到第 4 个字节(即 rx_cnt==4)时，
         // UART1_Rxbuff[3] 刚好就是上位机定义的 
         //  2(包头) + 1(cmd) + 1(len) + 实际数据长度 + 2(包尾)
@@ -48,10 +70,10 @@ void Protocol_Parse_Byte(uint8_t rx_temp)
             
             if (rx_cnt == expect_total_len) 
             {
-                // 精准锁定动态包尾进行校验
+                //  包尾 校验
                 if (UART1_Rxbuff[rx_cnt - 2] == 0xB6 && UART1_Rxbuff[rx_cnt - 1] == 0x6B)
                 {
-                    // 完美收工，提取核心账本
+                    //  提取核心参数
                     UR_Send_Msg.cmd  = UART1_Rxbuff[2];
                     UR_Send_Msg.len  = UART1_Rxbuff[3];
                     UR_Send_Msg.data = UART1_Rxbuff[4]; 

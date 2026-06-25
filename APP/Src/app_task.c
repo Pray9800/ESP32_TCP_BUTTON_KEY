@@ -1,4 +1,4 @@
-#include "app_task.h"
+﻿#include "app_task.h"
 #include "bsp_led.h"
 #include "esp_log.h"
 #include "bsp_key.h"
@@ -11,8 +11,11 @@
 #include "bsp_wifi.h"           
 #include "lwip/sockets.h"        
 #include "bsp_parse.h"
+#include "bsp_iwdg.h"
+#include <errno.h>
+#include "freertos/semphr.h"             //  引入 FreeRTOS 信号量头文件
 
-
+SemaphoreHandle_t xTcpSendMutex = NULL;  //   声明一个全局的 TCP 发送互斥锁
 
 uint8_t g_keys_value = 0, g_keys_value_last = 0;//按键之后返回值
 uint8_t g_rgb_value = 0, g_rgb_sign = 0, g_rgb_sign_last = 0; //UR机械臂传来的sig 和对应颜色数值的value
@@ -56,43 +59,84 @@ static void vTask_Led_Blink(void *pvParameters)
 
 
 // ==================== 任务二：按键扫描逻辑任务 ====================
+ /*******************************************************
+ Author: PAN        Version: V1.0       Date:2026/06/15
+ Function:          vTask_Key_Sig
+ Description:       按键扫描并检测按键值变化，通过TCP发送按键数据到客户端
+ Input:             pvParameters - FreeRTOS任务参数（未使用）
+ Output:            无
+ Return:            无
+ Others:            此任务为FreeRTOS任务，优先级7（最高），10ms周期扫描按键并上报
+*******************************************************/
 static void vTask_Key_Sig(void *pvParameters)
 {
     // 灯带初始化3
-    bsp_key_init(); // 四个按键的GPIO配置
-  
-     ESP_LOGI(TAG, "hello wisdom pan 2027"); 
+     bsp_key_init(); // 四个按键的GPIO配置
+     BSP_IWDG_Add_Current_Task();
+      
 
     
     while (1)
     {     
         // 周期性扫描 10ms 消抖
         g_keys_value = Key_Process_Scan(); 
+        
         //数据有变
         if(g_keys_value != g_keys_value_last)
         {    
             wifi_key_msg[4] = g_keys_value;   //按键信号赋值 
 
-            // 确定wifi是否连着
-            if (g_active_tcp_sock != -1) 
+            // 确定wifi是否连着，并且确保互斥锁已经创建
+            if (g_active_tcp_sock != -1 && xTcpSendMutex != NULL) 
             {
-              send(g_active_tcp_sock, wifi_key_msg, sizeof(wifi_key_msg), 0);
+                // 1. 尝试获取发送互斥锁（最多等100ms），防止跟灯带任务抢通道
+                if (xSemaphoreTake(xTcpSendMutex, pdMS_TO_TICKS(100)) == pdTRUE) 
+                {
+                    int ret = send(g_active_tcp_sock, wifi_key_msg, sizeof(wifi_key_msg), 0);
+                    
+                    // 2. 发完立刻释放锁，让出通道
+                    xSemaphoreGive(xTcpSendMutex); 
+
+                    if (ret >= 0) {
+                        g_keys_value_last = g_keys_value;
+                        
+                     
+                
+                        Sys_Delay(20); 
+                        
+                    } else {
+                        ESP_LOGW(TASK2, "send key failed, errno=%d", errno);
+                    }
+                }
             }
-            Sys_Delay(10);
-            g_keys_value_last = g_keys_value; //保存
+            else
+            {
+              // 如果断网了，照常更新状态，防止重连后误发旧状态
+              g_keys_value_last = g_keys_value;
+            }
             ESP_LOGI(TASK2, "key value: %d", g_keys_value); // 打印按键值到串口监视器
         }  
+        
         // 10ms延时
-        Sys_Delay(10); 
+        BSP_IWDG_Feed();
+        Sys_Delay(10);
     }
 
 }
 
-
-
-
+// ==================== 任务三：app_task_tcp.c ====================
+ 
 
 // ==================== 任务四：灯带动态控制与刷新 ====================
+ /*******************************************************
+ Author: PAN        Version: V1.0       Date:2026/06/15
+ Function:          vTask_WsLight_Change
+ Description:       控制WS2812灯带颜色、亮度及闪烁状态，接收TCP指令并实时刷新灯带输出
+ Input:             pvParameters - FreeRTOS任务参数（未使用）
+ Output:            无
+ Return:            无
+ Others:            此任务为FreeRTOS任务，优先级5，10ms周期调度，支持红灯500ms闪烁及任务通知机制
+*******************************************************/
 void vTask_WsLight_Change(void *pvParameters)
 {
     
@@ -134,7 +178,7 @@ void vTask_WsLight_Change(void *pvParameters)
                 if (g_active_tcp_sock != -1) 
             {  
                 wifi_Light_msg[4]= UR_Send_Msg.data;
-                send(g_active_tcp_sock, wifi_Light_msg, sizeof(wifi_Light_msg), 0);                  
+                send(g_active_tcp_sock, wifi_Light_msg, sizeof(wifi_Light_msg), 0);
             }
         }
 
@@ -192,7 +236,11 @@ void vTask_WsLight_Change(void *pvParameters)
 // ==================== APP 任务层 ====================
 void app_task_init(void)
 {
+    BSP_IWDG_Global_Init(3);
+
+
     
+    xTcpSendMutex = xSemaphoreCreateMutex(); 
     // 创建指示灯闪烁任务（优先级设为较低的 4）
     xTaskCreate(vTask_Led_Blink, "vTask_Led_Blink", 1024, NULL, 4, NULL);
 
@@ -210,17 +258,17 @@ void app_task_init(void)
 
 
 
-#if rtos_mode
-// 任务的“登记处”
-void app_task_init(void)
-{
-    xTaskCreate(
-        task_led,           // 1. 任务函数名
-        "led_task",         // 2. 任务名字 (用于调试)
-        2048,               // 3. 堆栈大小 (字节)
-        NULL,               // 4. 传递给任务的参数
-        5,                  // 5. 优先级 (数值越大越高)
-        NULL                // 6. 任务句柄
-    );
-}
-#endif
+// #if rtos_mode
+// // 任务的“登记处”
+// void app_task_init(void)
+// {
+//     xTaskCreate(
+//         task_led,           // 1. 任务函数名
+//         "led_task",         // 2. 任务名字 (用于调试)
+//         2048,               // 3. 堆栈大小 (字节)
+//         NULL,               // 4. 传递给任务的参数
+//         5,                  // 5. 优先级 (数值越大越高)
+//         NULL                // 6. 任务句柄
+//     );
+// }
+// #endif
