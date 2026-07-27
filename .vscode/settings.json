@@ -1,6 +1,8 @@
 {
   "C_Cpp.intelliSenseEngine": "default",
+  "C_Cpp.default.compileCommands": "E:/JT-004/JT004-MARKER-ESP32-V1.0/build/compile_commands.json",
   "idf.extensionActivationMode": "always",
+  "idf.buildPathWin": "E:\\JT-004\\JT004-MARKER-ESP32-V1.0\\build",
   "idf.openOcdConfigs": [
     "board/esp32s3-builtin.cfg"
   ],
@@ -13,9 +15,9 @@
   "clangd.arguments": [
     "--background-index",
     "--query-driver=**",
-    "--compile-commands-dir=e:\\JT-004\\JT004-MARKER-ESP32-V1.0\\build"
+    "--compile-commands-dir=E:\\JT-004\\JT004-MARKER-ESP32-V1.0\\build"
   ],
+  "stm32cube-ide-clangd.enable": false,
   "idf.flashType": "UART",
   "python-envs.defaultEnvManager": "ms-python.python:system"
-  
 }

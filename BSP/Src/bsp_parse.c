@@ -1,3 +1,4 @@
+#include "app_task.h"
 #include "bsp_parse.h"
 #include "esp_log.h"
 #include "esp_system.h"
@@ -50,9 +51,19 @@ void Protocol_Parse_Byte(uint8_t rx_temp)
                 UART1_Rxbuff[4] == 0x00 && UART1_Rxbuff[5] == 0xB6 && 
                 UART1_Rxbuff[6] == 0x6B) 
             {
-                ESP_LOGW(TAG, "收到软复位指令，主控即将重启！");
+                ESP_LOGW(TAG, "收到软复位指令");
                 Sys_Delay(50); // 给串口留 50ms 打印日志的时间
                 esp_restart();                 // 触发硬件级重启
+            }
+
+            if (UART1_Rxbuff[2] == 0x0D &&UART1_Rxbuff[3] == 0x01 &&
+                UART1_Rxbuff[4] == 0x00 &&UART1_Rxbuff[5] == 0xB6 &&
+                UART1_Rxbuff[6] == 0x6B)
+            {
+                ESP_LOGW(TAG, "收到按键查询指令");
+                
+                  g_key_query_flag = 1;
+                  rx_cnt = 0;
             }
         }
 

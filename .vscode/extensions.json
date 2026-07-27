@@ -1,0 +1,10 @@
+﻿{
+  "recommendations": [
+    "llvm-vs-code-extensions.vscode-clangd",
+    "espressif.esp-idf-extension"
+  ],
+  "unwantedRecommendations": [
+    "stmicroelectronics.stm32cube-ide-clangd",
+    "ms-vscode.cpptools"
+  ]
+}

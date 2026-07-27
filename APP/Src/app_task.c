@@ -1,4 +1,4 @@
-﻿#include "app_task.h"
+#include "app_task.h"
 #include "bsp_led.h"
 #include "esp_log.h"
 #include "bsp_key.h"
@@ -29,9 +29,9 @@ uint8_t g_brightness = 100; //全局亮度
 uint8_t g_brightness_flag = 0; //亮度变化指令
 uint8_t g_red_blink_state = 1; //红灯闪烁状态 灯带闪烁 不是指示灯 初始化为1 保证先亮灯
 uint16_t wsred_cnt = 0;        // 闪烁时间毫秒累加器
-
+volatile uint8_t g_key_query_flag = 0; //主动按键查询  
 //任务通知类型
-static const char *TAG = "TSAK_APP";//用于应答
+// static const char *TAG = "TSAK_APP";//用于应答
 static const char *TASK2 = "TSAK_KEY";//用于应答
 static const char *TASK4 = "TSAK_WS_Light";//用于应答
 
@@ -73,36 +73,35 @@ static void vTask_Key_Sig(void *pvParameters)
     // 灯带初始化3
      bsp_key_init(); // 四个按键的GPIO配置
      BSP_IWDG_Add_Current_Task();
-      
+ 
 
-    
     while (1)
     {     
-        // 周期性扫描 10ms 消抖
-        g_keys_value = Key_Process_Scan(); 
+        // 周期性扫描 15ms 消抖  已经包含15ms延时
+        g_keys_value = Key_Process_Scan();  
         
         //数据有变
-        if(g_keys_value != g_keys_value_last)
+        if(g_keys_value != g_keys_value_last|| g_key_query_flag)
         {    
+            g_key_query_flag=0; //清除查询标志位
             wifi_key_msg[4] = g_keys_value;   //按键信号赋值 
 
             // 确定wifi是否连着，并且确保互斥锁已经创建
             if (g_active_tcp_sock != -1 && xTcpSendMutex != NULL) 
             {
-                // 1. 尝试获取发送互斥锁（最多等100ms），防止跟灯带任务抢通道
+                //  获取 TCP 发送互斥锁 (超时100ms)
                 if (xSemaphoreTake(xTcpSendMutex, pdMS_TO_TICKS(100)) == pdTRUE) 
                 {
                     int ret = send(g_active_tcp_sock, wifi_key_msg, sizeof(wifi_key_msg), 0);
                     
-                    // 2. 发完立刻释放锁，让出通道
+                    //  发完立刻释放锁 
                     xSemaphoreGive(xTcpSendMutex); 
 
                     if (ret >= 0) {
                         g_keys_value_last = g_keys_value;
+                      
+                        Sys_Delay(35); 
                         
-                     
-                
-                        Sys_Delay(20); 
                         
                     } else {
                         ESP_LOGW(TASK2, "send key failed, errno=%d", errno);
@@ -111,15 +110,15 @@ static void vTask_Key_Sig(void *pvParameters)
             }
             else
             {
-              // 如果断网了，照常更新状态，防止重连后误发旧状态
+              // 断网状态下保持缓存更新， 
               g_keys_value_last = g_keys_value;
             }
             ESP_LOGI(TASK2, "key value: %d", g_keys_value); // 打印按键值到串口监视器
         }  
         
-        // 10ms延时
+        
         BSP_IWDG_Feed();
-        Sys_Delay(10);
+        
     }
 
 }
@@ -141,10 +140,14 @@ void vTask_WsLight_Change(void *pvParameters)
 {
     
     ws2812_spi_init();// 初始化 SPI 和 DMA
-    ws2812_set_num_spi(WS_ARRAY_SIZE, 255, 255, 255); Sys_Delay(300);
+   
     ws2812_set_num_spi(WS_ARRAY_SIZE, 100, 100, 100); Sys_Delay(300);
     ws2812_set_num_spi(WS_ARRAY_SIZE, 0, 0, 255);     Sys_Delay(300);
-    ws2812_set_num_spi(WS_ARRAY_SIZE, 50, 50, 50);    Sys_Delay(300);
+    ws2812_set_num_spi(WS_ARRAY_SIZE, 100, 100, 100); Sys_Delay(300);
+
+    g_rgb_sign = 1;       // 1代表白色指令
+    g_rgb_sign_last = 1;  
+    g_rgb_value = 7;      // 蓝色的骨架 (001)
     const TickType_t xFrequency = pdMS_TO_TICKS(10); // 10ms的意思
     
     ESP_LOGI(TASK4, "WS2812灯带指令控制");
@@ -152,9 +155,9 @@ void vTask_WsLight_Change(void *pvParameters)
     while (1) 
     {
      
-        uint32_t notified = ulTaskNotifyTake(pdTRUE, xFrequency);  //等10ms 没有任务就去执行红灯闪烁
+        uint32_t notified = ulTaskNotifyTake(pdTRUE, xFrequency);  //等10ms 没有任务通知就去执行红灯闪烁
 
-        // ==================== 如果是网络丢来了新指令 ====================
+        // ====================  网络丢 新指令 ====================
         if (notified > 0)  
         {
             
@@ -174,12 +177,17 @@ void vTask_WsLight_Change(void *pvParameters)
                 else if (g_rgb_sign == 1) g_rgb_value = 7; // 白
             }
 
-                //反馈更新
-                if (g_active_tcp_sock != -1) 
-            {  
+ 
+        //反馈更新
+        if (g_active_tcp_sock != -1 && xTcpSendMutex != NULL) 
+        {  
+            if (xSemaphoreTake(xTcpSendMutex, pdMS_TO_TICKS(100)) == pdTRUE) 
+            {
                 wifi_Light_msg[4]= UR_Send_Msg.data;
                 send(g_active_tcp_sock, wifi_Light_msg, sizeof(wifi_Light_msg), 0);
+                xSemaphoreGive(xTcpSendMutex); // 发完立刻释放，让出通道
             }
+        }
         }
 
         // ====================   10ms  ====================
@@ -203,30 +211,23 @@ void vTask_WsLight_Change(void *pvParameters)
         //  刷新判定状态机
         if ((g_rgb_sign != g_rgb_sign_last) || g_brightness_flag) 
         {
-            rgb_cnt++; // 刷新次数
-            if (rgb_cnt >= 3) 
-            {   
-                rgb_cnt = 0;
-                g_rgb_sign_last = g_rgb_sign; // 达到 3 次，锁定不再重复刷新
-                g_brightness_flag = 0;        // 清除亮度变化标志
+            g_rgb_sign_last = g_rgb_sign;
+            g_brightness_flag = 0;
+            //计算亮度
+            uint8_t current_brightness = g_brightness;
+            if (g_rgb_sign == 5 && g_red_blink_state == 0) 
+            {
+                current_brightness = 0; // 灭灯状态
+            }
 
-            } 
-            else 
-            {  
-                // 计算当前亮灭闪烁状态下的实际输出亮度
-                uint8_t current_brightness = g_brightness;
-                if (g_rgb_sign == 5 && g_red_blink_state == 0) 
-                {
-                    current_brightness = 0; // 灭灯状态，亮度强行归零
-                }
-                
-               
-                // 执行灯带灯光
+            for(int i = 0; i < 2; i++)
+            {
                 ws2812_set_num_spi(WS_ARRAY_SIZE, 
                                   ((g_rgb_value >> 2) & 0x01) * current_brightness, 
                                   ((g_rgb_value >> 1) & 0x01) * current_brightness, 
                                   ((g_rgb_value & 0x01))      * current_brightness);
-            }              
+                Sys_Delay(1); //  
+            }           
         }
     }
 }
@@ -255,20 +256,3 @@ void app_task_init(void)
 
 }
 
-
-
-
-// #if rtos_mode
-// // 任务的“登记处”
-// void app_task_init(void)
-// {
-//     xTaskCreate(
-//         task_led,           // 1. 任务函数名
-//         "led_task",         // 2. 任务名字 (用于调试)
-//         2048,               // 3. 堆栈大小 (字节)
-//         NULL,               // 4. 传递给任务的参数
-//         5,                  // 5. 优先级 (数值越大越高)
-//         NULL                // 6. 任务句柄
-//     );
-// }
-// #endif

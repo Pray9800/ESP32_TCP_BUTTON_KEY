@@ -57,7 +57,7 @@ uint8_t Key_Process_Scan(void)
      uint8_t keys_value_first, keys_value_second;
      keys_value_first = Key_Scan_Once();
      
-     Sys_Delay(10);  
+     Sys_Delay(15);  
      
      keys_value_second = Key_Scan_Once();
      if (keys_value_second == keys_value_first && keys_value_second != 0) {

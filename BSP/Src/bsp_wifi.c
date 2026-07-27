@@ -86,7 +86,7 @@ if (ap_netif != NULL)
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));  //AP/STA
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config)); //AP STA
     ESP_ERROR_CHECK(esp_wifi_start());
-
+    esp_wifi_set_ps(WIFI_PS_NONE);  // 不省电
     ESP_LOGI(TAG, "Wi-Fi AP 启动成功! SSID: YOZX-C6, 密码: 12345678");
     ESP_LOGI(TAG, "TCP Server 默认 IP 地址为: 192.168.100.125");
 }
