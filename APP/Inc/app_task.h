@@ -14,10 +14,28 @@
 // #define BRIGHTNESS 100   //亮度
 
 
+// ==================== 网络命令 CMD 宏定义 ====================
+#define CMD_SET_COLOR    0x0A  // 灯光颜色设定 / 按键状态上报  
+#define CMD_SET_BRIGHT   0x0B  // 灯光亮度设定  
+#define CMD_ACK_COLOR    0x0C  // 灯光控制应答  
+#define CMD_BUT_CHECK    0x0D  // 按键状态查询  
+#define CMD_SYS_RESET    0x0F  // 系统软复位 
+
+//  序列号配置相关指令
+#define CMD_SET_SN       0x11  // 写入序列号（触发重启）
+#define CMD_RESET_SN     0x12  // 恢复出厂序列号（触发重启）
+#define CMD_GET_SN       0x13  // 读取当前序列号
+//用于更改wifi的名称
+#define NVS_NAMESPACE_WIFI  "wifi_cfg"      // NVS 命名空间
+#define NVS_KEY_SN          "sn"            // NVS 序列号 Key
+
+
 
 // ==================== UR机械臂  WIFI连接版本网络初始化配置 ====================
-#define C6_WIFI_SSID          "YOZX-C6-1"        // Wi-Fi 热点名称
-#define C6_WIFI_PASS          "12345678"       // Wi-Fi 密码
+#define C6_WIFI_SSID     "YOZX-C6"        // Wi-Fi 名称
+#define C6_SSID_PREFIX   "YOZX-"        // SSID 固定前缀
+#define DEFAULT_SN       "00000000"     // 默认 8 位序列号
+#define C6_WIFI_PASS      "12345678"       // Wi-Fi 密码
 
 #define C6_SERVER_IP          "192.168.100.125"// ESP32 本机静态IP
 #define C6_SERVER_NETMASK     "255.255.255.0"  // 子网掩码
@@ -26,10 +44,8 @@
 #define C6_TCP_PORT           8238             // 监听端口
 
 
-
-
 extern TaskHandle_t xWsLightTaskHandle;
- extern volatile uint8_t g_key_query_flag;//按键查询标志位
+extern volatile uint8_t g_key_query_flag;//按键查询标志位
 //初始化并启动 APP 层的全部 RTOS 任务
  
 void app_task_init(void);
@@ -44,6 +60,7 @@ void vTask_TCP_Server(void *pvParameters);  //TCP连接单独一个文件
  * 硬件与网络资源映射
  * ============================================================
  * WIFI   →  SoftAP 热点模式 (SSID: YOZX-C6)
+ *         支持通过配置命令修改热点名称（SSID），并可与序列号配置联动
  * TCP    →  Server 监听模式 (Port: 8238, TCP_NODELAY 开启)
  * SPI2   →  WS2812 灯带驱动 (DMA 异步全双工, MOSI: IO38)
  * GPIO   →  本地独立按键矩阵 (4路按键)

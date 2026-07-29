@@ -1,18 +1,108 @@
 #include "bsp_wifi.h"
 #include "esp_wifi.h"
+#include "lwip/opt.h"
 #include "nvs_flash.h"
 #include "esp_log.h"
 #include <string.h>
 #include "esp_netif.h"
 #include "lwip/ip_addr.h"
 #include "app_task.h"
+#include "esp_system.h"
+#include "string.h"
 #define MODE_AP   0  // 热点模式
 #define MODE_STA  1  // 联网模式
 #define WIFI_MODE_SELECT   MODE_AP
 
 
 
+
+
 static const char *TAG = "BSP_WIFI";//用于应答
+
+
+
+
+
+ /*******************************************************
+ Author: PAN       Version: V1.0       Date:2026/07/28
+ Function:          wifi_get_sn
+ Description:       从NVS中读取WiFi模块序列号；若未找到或内容无效，则使用默认序列号
+ Input:             sn_buf: 存储序列号的缓冲区
+ Output:            sn_buf: 返回读取到的序列号或默认序列号
+ Return:            ESP_OK: 成功读取或使用默认值
+                    ESP_ERR_INVALID_ARG: 输入参数非法
+ Others:            默认序列号由 DEFAULT_SN 定义，确保首次启动时有可用值
+*******************************************************/
+esp_err_t wifi_get_sn(char *sn_buf, size_t max_len)
+{   
+    // 检查输入参数的有效性
+    if (sn_buf == NULL || max_len < 9) {
+        return ESP_ERR_INVALID_ARG;
+    }  
+
+    nvs_handle_t nvs_handle;
+    //用于第一次启动
+    //读取NVS中的序列号，如果没有找到则使用默认值
+    esp_err_t err = nvs_open(NVS_NAMESPACE_WIFI, NVS_READONLY, &nvs_handle);
+    if (err != ESP_OK) {
+        // NVS 未找到或未写入过，使用默认序列号 默认为八个0的序列号 原因在于
+        strncpy(sn_buf, DEFAULT_SN, max_len); //保存操作后的sn_buf
+        return ESP_OK;
+    }
+     //用于重启
+    size_t required_size = max_len;
+    err = nvs_get_str(nvs_handle, NVS_KEY_SN, sn_buf, &required_size);
+    nvs_close(nvs_handle); //释放nvs_handle资源 解除绑定
+    //写入的有问题 或者不对 还是保持原来的8个0 
+    if (err != ESP_OK || strlen(sn_buf) != 8) {
+        strncpy(sn_buf, DEFAULT_SN, max_len);
+    }
+    return ESP_OK;
+}
+
+
+ /*******************************************************
+ Author: PAN       Version: V1.0       Date:2026/07/28
+ Function:          wifi_set_sn
+ Description:       将指定的WiFi模块序列号写入NVS中，供下次启动时读取
+ Input:             sn_str: 需要保存的8位序列号字符串
+ Output:            无
+ Return:            ESP_OK: 成功写入NVS
+                    ESP_ERR_INVALID_ARG: 输入参数非法
+                    其他ESP错误码: NVS打开或提交失败
+ Others:            序列号长度必须为8位，且会通过 nvs_commit 提交保存
+*******************************************************/
+esp_err_t wifi_set_sn(const char *sn_str)
+{
+    if (sn_str == NULL || strlen(sn_str) != 8) {
+        return ESP_ERR_INVALID_ARG;
+    }  //只需要八位的
+
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_open(NVS_NAMESPACE_WIFI, NVS_READWRITE, &nvs_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "NVS Open Failed: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    err = nvs_set_str(nvs_handle, NVS_KEY_SN, sn_str);
+    if (err == ESP_OK) {
+        err = nvs_commit(nvs_handle);
+    }
+    nvs_close(nvs_handle);
+    return err;
+}
+//初始化
+
+esp_err_t wifi_reset_sn(void)
+{
+    return wifi_set_sn(DEFAULT_SN);
+}
+
+
+
+
+
 
  /*******************************************************
  Author: PAN       Version: V1.0       Date:2026/06/15
@@ -32,6 +122,20 @@ void wifi_init_softap(void)
       ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
+
+
+    // ------------------ 【wifi改动：读取 NVS 序列号并拼接 SSID】 ------------------
+    char sn_str[10] = {0};
+    wifi_get_sn(sn_str, sizeof(sn_str)); // 读取 8 位 SN，读不到默认 "00000000"
+    char full_ssid[32] = {0};
+    strcpy(full_ssid,C6_SSID_PREFIX); //组装前缀
+    strncat(full_ssid,sn_str,8); //现在8位
+    //序列号改成不是8位的时候采用下面函数做拼接
+   // snprintf(full_ssid, sizeof(full_ssid), "%s%s", C6_SSID_PREFIX, sn_str); // 拼接为 "YOZX-20260001"
+    // -----------------------------------------------------------------------------
+
+
+
 
     // 2. 初始化网络接口
     ESP_ERROR_CHECK(esp_netif_init());
@@ -70,33 +174,33 @@ if (ap_netif != NULL)
 
     wifi_config_t wifi_config = {
         .ap = {
-            .ssid = C6_WIFI_SSID,                  // wifi名称 
-            .ssid_len = strlen(C6_WIFI_SSID),      // 长度
+            //省略 改用拼接模式
+            // .ssid = C6_WIFI_SSID,                  // wifi名称 
+            // .ssid_len = strlen(C6_WIFI_SSID),      // 长度
             .password = C6_WIFI_PASS,              // 密码
             .max_connection = 10,           // 最大连接数
             .authmode = WIFI_AUTH_WPA2_PSK // 加密方式
 
-            //STAmode配置示例
-            
+            //STAmode配置示例           
         // .threshold.rssi = -127,         // 允许连接信号极弱的路由器
         // .scan_method = WIFI_FAST_SCAN,  // 快速扫描模式，连网速度极快
         },
     };
 
+    //  将动态拼接好的 full_ssid 复制给 wifi_config 结构体 
+    //把十六禁止强制转换为字符串
+    //wifi_config.ap.ssid 是专门用于保存wifi 名称的寄存器 
+    strncpy((char *)wifi_config.ap.ssid, full_ssid, sizeof(wifi_config.ap.ssid));
+    wifi_config.ap.ssid_len = strlen(full_ssid);
+
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));  //AP/STA
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config)); //AP STA
     ESP_ERROR_CHECK(esp_wifi_start());
     esp_wifi_set_ps(WIFI_PS_NONE);  // 不省电
-    ESP_LOGI(TAG, "Wi-Fi AP 启动成功! SSID: YOZX-C6, 密码: 12345678");
+
+    ESP_LOGI(TAG, "Wi-Fi AP 启动成功! 真实 SSID: %s, 密码: %s", full_ssid, C6_WIFI_PASS);
     ESP_LOGI(TAG, "TCP Server 默认 IP 地址为: 192.168.100.125");
 }
-
-
-
-
-
-
-
 
 
 
