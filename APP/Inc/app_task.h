@@ -77,7 +77,7 @@ void vTask_TCP_Server(void *pvParameters);  //TCP连接单独一个文件
  * [下行指令 (上位机 下发指令)]
  * 0x0A : 灯光颜色设定 (1:白光 2:蓝光 3:绿光 4:红常亮 5:红闪)
  * 0x0B : 灯光亮度设定 (0~255 全局亮度倍率)
- * 0x0F : 系统软复位   (数据域 0x01 触发 esp_restart)
+ * 0x0F : 系统软复位   (数据域 0x00 触发 esp_restart)
  *
  *
  * 指令与数据流向

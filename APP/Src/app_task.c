@@ -147,7 +147,7 @@ void vTask_WsLight_Change(void *pvParameters)
 
     g_rgb_sign = 1;       // 1代表白色指令
     g_rgb_sign_last = 1;  
-    g_rgb_value = 7;      // 蓝色的骨架 (001)
+    g_rgb_value = 7;      // bai色的骨架 (001)
     const TickType_t xFrequency = pdMS_TO_TICKS(10); // 10ms的意思
     
     ESP_LOGI(TASK4, "WS2812灯带指令控制");
