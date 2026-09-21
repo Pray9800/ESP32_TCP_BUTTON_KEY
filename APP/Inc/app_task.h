@@ -25,10 +25,12 @@
 #define CMD_SET_SN       0x11  // 写入序列号（触发重启）
 #define CMD_RESET_SN     0x12  // 恢复出厂序列号（触发重启）
 #define CMD_GET_SN       0x13  // 读取当前序列号
+
 //用于更改wifi的名称
 #define NVS_NAMESPACE_WIFI  "wifi_cfg"      // NVS 命名空间
 #define NVS_KEY_SN          "sn"            // NVS 序列号 Key
-
+//用于版本
+#define FW_VERSION_STR    "FW-JT004-02 V1.0.0.20250704"
 
 
 // ==================== UR机械臂  WIFI连接版本网络初始化配置 ====================

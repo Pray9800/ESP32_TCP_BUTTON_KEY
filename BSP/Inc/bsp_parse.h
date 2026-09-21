@@ -17,5 +17,6 @@ extern uart1_data_t UR_Send_Msg;
 extern TaskHandle_t xWsLightTaskHandle;
 //解析函数声明
 void Protocol_Parse_Byte(uint8_t rx_temp);
-
+//字符串解析申明 用于版本查询
+void ASCII_Parse_Byte(uint8_t rx_temp);
 #endif

@@ -60,7 +60,8 @@ void vTask_TCP_Server(void *pvParameters)
                 // 解析数据包 带入解析函数
                 for (int i = 0; i < len; i++) 
                 {
-                    Protocol_Parse_Byte((uint8_t)rx_buffer[i]);                 
+                    Protocol_Parse_Byte((uint8_t)rx_buffer[i]); 
+                    ASCII_Parse_Byte((uint8_t)rx_buffer[i]); 
                 }
             } 
             else if (len == 0) 

@@ -1,0 +1,14 @@
+﻿CompileFlags:
+  Remove:
+    - -f*
+    - -m*
+    - -mlongcalls
+    - -mtext-section-literals
+Index:
+  Background: Build
+Diagnostics:
+  Suppress:
+    - drv_unknown_argument
+    - drv_unsupported_opt
+    - pp_file_not_found
+    - unused_command_line_argument
