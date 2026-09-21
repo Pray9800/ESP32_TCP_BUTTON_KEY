@@ -5,6 +5,7 @@
 #include "bsp_tim.h"
 #include "bsp_wifi.h"
 #include "lwip/sockets.h"
+#include "string.h"
 uart1_data_t UR_Send_Msg;
 static uint8_t UART1_Rxbuff[64]; // 内部帧缓存
 
@@ -166,7 +167,7 @@ void Protocol_Parse_Byte(uint8_t rx_temp)
 
                             if (g_active_tcp_sock >= 0) send(g_active_tcp_sock, resp, 10, 0);
                             ESP_LOGI(TAG, "上报当前序列号: %s", current_sn);
-                        }
+                        }                   
                     }
                 }
                 rx_cnt = 0; // 清零，等待下一帧
@@ -176,5 +177,32 @@ void Protocol_Parse_Byte(uint8_t rx_temp)
                 rx_cnt = 0; // 安全防线，放宽到 32 字节以防长包被截断
             }
         }
+    }
+}
+
+
+/*******************************************************
+ Author: PAN       Version: V1.0       Date:2026/09/20
+ Function:           ASCII_Parse_Byte
+ Description:       版本查询
+ Input:             rx_temp: 单字节串口输入数据
+ Output:            无
+ Return:            无
+ Others:            帧格式为 A5 5A cmd len data... B6 6B，支持命令分发与状态机复位
+*******************************************************/
+void ASCII_Parse_Byte(uint8_t rx_temp)
+{
+    // VERSION 查询指令 (7字节滑动窗口, 不依赖换行符)
+    static char ver_buf[8] = {0};
+
+    memmove(ver_buf, ver_buf + 1, 6);
+    ver_buf[6] = (char)rx_temp;
+
+    if (strcmp(ver_buf, "VERSION") == 0)
+    {
+        char resp[64];
+        int n = snprintf(resp, sizeof(resp), "%s\r\n", FW_VERSION_STR);
+        if (g_active_tcp_sock >= 0) send(g_active_tcp_sock, resp, n, 0);
+        ESP_LOGI(TAG, "上报固件版本: %s", FW_VERSION_STR);
     }
 }
